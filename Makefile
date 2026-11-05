@@ -5,13 +5,13 @@
 #  этапах трансляции: препроцессор -> токены -> синтаксическое дерево (AST)
 #  -> ассемблер -> объектный файл -> исполняемый файл.
 #
-#  Примеры 4 и 5 работают с симуляцией ЖК-дисплея HD44780 (hd44780_sim.h)
+#  Примеры 4 и 5 работают с симуляцией ЖК-дисплея HD44780 (include/hd44780_sim.hpp)
 #  и дополнительно демонстрируют:
 #     - конфигурацию макросами и условную компиляцию (#if/#error),
 #     - передачу макросов из командной строки (-DDEBUG, -DLCD_CONFIG_BIT=8),
 #     - генерацию имён регистров оператором ## и строки оператором #.
 #
-#  Пример 6 — протопотоки (Protothread.h): кооперативная многозадачность,
+#  Пример 6 — протопотоки (include/Protothread.h): кооперативная многозадачность,
 #  целиком собранная из макросов (__LINE__ + switch + небалансные скобки).
 #
 #  Быстрый старт:
@@ -27,15 +27,15 @@
 
 # --- Инструменты и флаги ------------------------------------------------------
 CXX        := g++
-CXXFLAGS   := -std=c++17 -Wall -Wextra
+CXXFLAGS   := -std=c++17 -Wall -Wextra -Iinclude
 CLANG      := clang++
-CLANGFLAGS := -std=c++17
+CLANGFLAGS := -std=c++17 -Iinclude
 
 # --- Каталоги и источники -----------------------------------------------------
 BUILD      := build
-SRCS       := $(sort $(wildcard example_*.cpp))   # новые примеры подхватятся сами
-HDRS       := $(wildcard *.h)                     # общие заголовки (hd44780_sim.h)
-NAMES      := $(SRCS:.cpp=)
+SRCS       := $(sort $(wildcard src/example_*.cpp))          # новые примеры подхватятся сами
+HDRS       := $(wildcard include/*.hpp) $(wildcard include/*.h)
+NAMES      := $(notdir $(SRCS:.cpp=))
 
 BINS       := $(addprefix $(BUILD)/,$(NAMES))
 OBJS       := $(addsuffix .o,$(BINS))
@@ -58,56 +58,56 @@ $(BUILD):
 # ==============================================================================
 
 # Исполняемый файл
-$(BUILD)/%: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[build]     $< -> $@"
 	@$(CXX) $(CXXFLAGS) $< -o $@
 
 # Исполняемый файл с отладочным макросом (демонстрация ключа -D)
-$(BUILD)/%-debug: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%-debug: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[build-dbg] $< -> $@  (-DDEBUG)"
 	@$(CXX) $(CXXFLAGS) -DDEBUG $< -o $@
 
 # Объектный файл (компиляция без компоновки)
-$(BUILD)/%.o: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.o: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[object]    $< -> $@"
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Ассемблерный листинг
-$(BUILD)/%.s: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.s: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[asm]       $< -> $@"
 	@$(CXX) $(CXXFLAGS) -S $< -o $@
 
 # Код после препроцессора (полный, с маркерами строк "# N \"file\"")
-$(BUILD)/%.ii: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.ii: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[preproc]   $< -> $@"
 	@$(CXX) $(CXXFLAGS) -E $< -o $@
 
 # Код после препроцессора, читаемый (без маркеров строк, -P)
-$(BUILD)/%.ppi: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.ppi: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[preproc-P] $< -> $@"
 	@$(CXX) $(CXXFLAGS) -E -P $< -o $@
 
-# Только СОБСТВЕННЫЙ код (example_N.cpp и *.h проекта) после препроцессора:
+# Только СОБСТВЕННЫЙ код (src/ и include/ проекта) после препроцессора:
 # системные заголовки отсекаются по маркерам строк — удобно смотреть на
 # студенческих примерах, что именно получилось после раскрытия макросов.
-$(BUILD)/%.ppm: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.ppm: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[preproc-m] $< -> $@  (только собственный код)"
-	@$(CXX) $(CXXFLAGS) -E $< | awk '/^# [0-9]+ "/ { keep = ($$3 ~ /^"(example_[^"]+\.cpp|[A-Za-z0-9_]+\.h)"$$/ && $$3 !~ /\/usr\//) } !/^#/ && keep' > $@
+	@$(CXX) $(CXXFLAGS) -E $< | awk '/^# [0-9]+ "/ { keep = ($$3 ~ /^"(src|include)\//) } !/^#/ && keep' > $@
 
 # Синтаксическое дерево (Clang AST dump)
-$(BUILD)/%.ast: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.ast: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[ast]       $< -> $@"
 	@$(CLANG) $(CLANGFLAGS) -Xclang -ast-dump -fsyntax-only $< > $@ 2>/dev/null
 
 # Поток токенов после лексического анализа (Clang token dump)
-$(BUILD)/%.tokens: %.cpp $(HDRS) | $(BUILD)
+$(BUILD)/%.tokens: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[tokens]    $< -> $@"
 	@$(CLANG) $(CLANGFLAGS) -Xclang -dump-tokens -fsyntax-only $< > $@ 2>&1
 
 # ==============================================================================
 #  ДЕМО: конфигурация макросом из командной строки (example_4, -D...)
 # ==============================================================================
-$(BUILD)/example_4-8bit: example_4.cpp $(HDRS) | $(BUILD)
+$(BUILD)/example_4-8bit: src/example_4.cpp $(HDRS) | $(BUILD)
 	@echo "[build]     $< -> $@  (-DLCD_CONFIG_BIT=8)"
 	@$(CXX) $(CXXFLAGS) -DLCD_CONFIG_BIT=8 $< -o $@
 
@@ -223,7 +223,7 @@ help:
 	@echo "    run8bit             то же, но собранное с -DLCD_CONFIG_BIT=8"
 	@echo "    rundebug_4          включить отладочный вывод через -DDEBUG"
 	@echo ""
-	@echo "  Протопотоки (example_6, Protothread.h):"
+	@echo "  Протопотоки (example_6, include/Protothread.h):"
 	@echo "    run_6               4 кооперативные задачи в одном потоке"
 	@echo "    ppm_6               увидеть switch/case __LINE__ после препроцессора"
 	@echo ""

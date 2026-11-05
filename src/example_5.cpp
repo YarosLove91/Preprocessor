@@ -17,7 +17,7 @@
 // =============================================================================
 
 #include <iostream>
-#include "hd44780_sim.h"
+#include "hd44780_sim.hpp"
 
 using std::cout;
 using std::endl;

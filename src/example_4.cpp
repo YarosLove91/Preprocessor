@@ -23,7 +23,7 @@
 // =============================================================================
 
 #include <iostream>
-#include "hd44780_sim.h"   // симуляция дисплея + include guard (см. комментарии там)
+#include "hd44780_sim.hpp"   // симуляция дисплея + include guard (см. комментарии там)
 
 using std::cout;
 using std::endl;
@@ -103,7 +103,7 @@ using std::endl;
 #endif
     cout << endl;
 
-    // Состояние «регистров» после работы с дисплеем (см. hd44780_sim.h)
+    // Состояние «регистров» после работы с дисплеем (см. hd44780_sim.hpp)
     cout << "MCU registers:" << endl;
     printReg("PORTB", PORTB);
     printReg("PORTD", PORTD);

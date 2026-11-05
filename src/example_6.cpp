@@ -41,7 +41,7 @@
 #include <iostream>
 #include <string>
 #include "Protothread.h"     // «вся ОС» — один заголовочный файл из макросов
-#include "hd44780_sim.h"     // дисплей для итогового отчёта (примеры 4-5)
+#include "hd44780_sim.hpp"   // дисплей для итогового отчёта (примеры 4-5)
 
 using std::cout;
 using std::endl;
