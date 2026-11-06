@@ -14,6 +14,9 @@
 #  Пример 6 — протопотоки (include/Protothread.h): кооперативная многозадачность,
 #  целиком собранная из макросов (__LINE__ + switch + небалансные скобки).
 #
+#  Пример 7 — параметры компиляции: ключи -D/-U, значения по умолчанию через
+#  #ifndef, встроенные макросы компилятора (run7_log, run7_custom DEFS='-D...').
+#
 #  Быстрый старт:
 #     make help            - показать справку по всем целям
 #     make                 - собрать все исполняемые примеры
@@ -46,6 +49,11 @@ PPMAIN     := $(addsuffix .ppm,$(BINS))           # только собстве�
 ASTS       := $(addsuffix .ast,$(BINS))           # синтаксическое дерево (clang AST)
 TOKENS     := $(addsuffix .tokens,$(BINS))        # поток токенов (clang)
 DEBUGBINS  := $(addsuffix -debug,$(BINS))         # сборки с -DDEBUG
+
+# Фильтр для .ppm: оставить только строки из файлов проекта (src/, include/),
+# отбросив системные заголовки (определяются по маркерам строк "# N \"file\"").
+# Важно: # внутри присваивания переменной make — начало комментария, поэтому \#
+PPM_FILTER := awk '/^\# [0-9]+ "/ { keep = ($$3 ~ /^"(src|include)\//) } !/^\#/ && keep'
 
 .DEFAULT_GOAL := all
 
@@ -92,7 +100,7 @@ $(BUILD)/%.ppi: src/%.cpp $(HDRS) | $(BUILD)
 # студенческих примерах, что именно получилось после раскрытия макросов.
 $(BUILD)/%.ppm: src/%.cpp $(HDRS) | $(BUILD)
 	@echo "[preproc-m] $< -> $@  (только собственный код)"
-	@$(CXX) $(CXXFLAGS) -E $< | awk '/^# [0-9]+ "/ { keep = ($$3 ~ /^"(src|include)\//) } !/^#/ && keep' > $@
+	@$(CXX) $(CXXFLAGS) -E $< | $(PPM_FILTER) > $@
 
 # Синтаксическое дерево (Clang AST dump)
 $(BUILD)/%.ast: src/%.cpp $(HDRS) | $(BUILD)
@@ -115,6 +123,37 @@ $(BUILD)/example_4-8bit: src/example_4.cpp $(HDRS) | $(BUILD)
 run8bit: $(BUILD)/example_4-8bit
 	@echo "==================== example_4  (-DLCD_CONFIG_BIT=8) ===================="
 	@./$(BUILD)/example_4-8bit
+
+# ==============================================================================
+#  ДЕМО: передача параметров компиляции (example_7, ключи -D/-U)
+#  Цели пересобираются КАЖДЫЙ раз: параметры приходят из командной строки
+#  (make run7_custom DEFS='-DLED_COUNT=8 -DFEATURE_LOG')
+# ==============================================================================
+DEFS ?=
+
+.PHONY: run7_log run7_release run7_custom pp7_custom
+
+run7_log: | $(BUILD)
+	@echo "[build]     src/example_7.cpp -> $(BUILD)/example_7-log  (-DFEATURE_LOG)"
+	@$(CXX) $(CXXFLAGS) -DFEATURE_LOG src/example_7.cpp -o $(BUILD)/example_7-log
+	@./$(BUILD)/example_7-log
+
+run7_release: | $(BUILD)
+	@echo "[build]     src/example_7.cpp -> $(BUILD)/example_7-release  (-DNDEBUG -DAPP_VERSION=2 -O2)"
+	@$(CXX) $(CXXFLAGS) -DNDEBUG -DAPP_VERSION=2 -DAPP_NAME='"Release Build"' -O2 src/example_7.cpp -o $(BUILD)/example_7-release
+	@./$(BUILD)/example_7-release
+
+run7_custom: | $(BUILD)
+	@echo "[build]     src/example_7.cpp -> $(BUILD)/example_7-custom  ($(DEFS))"
+	@$(CXX) $(CXXFLAGS) $(DEFS) src/example_7.cpp -o $(BUILD)/example_7-custom
+	@./$(BUILD)/example_7-custom
+
+# Собственный код после препроцессора с теми же параметрами —
+# наглядно видно, что ключи -D сделали с исходником.
+pp7_custom: | $(BUILD)
+	@echo "[preproc-m] src/example_7.cpp -> $(BUILD)/example_7-custom.ppm  ($(DEFS))"
+	@$(CXX) $(CXXFLAGS) $(DEFS) -E src/example_7.cpp | $(PPM_FILTER) > $(BUILD)/example_7-custom.ppm
+	@echo "Результат: $(BUILD)/example_7-custom.ppm"
 
 # ==============================================================================
 #  ГРУППОВЫЕ ЦЕЛИ
@@ -226,6 +265,13 @@ help:
 	@echo "  Протопотоки (example_6, include/Protothread.h):"
 	@echo "    run_6               4 кооперативные задачи в одном потоке"
 	@echo "    ppm_6               увидеть switch/case __LINE__ после препроцессора"
+	@echo ""
+	@echo "  Параметры компиляции (example_7, ключи -D/-U):"
+	@echo "    run_7               сборка со значениями по умолчанию (#ifndef)"
+	@echo "    run7_log            сборка с -DFEATURE_LOG"
+	@echo "    run7_release        сборка с -DNDEBUG -DAPP_VERSION=2 -O2"
+	@echo "    run7_custom DEFS='-DLED_COUNT=8 -DFEATURE_LOG'"
+	@echo "    pp7_custom DEFS='...'  что сделали -D с кодом (.ppm)"
 	@echo ""
 	@echo "  Примеры:"
 	@echo "    make pp_2           во что разворачиваются макросы example_2"
